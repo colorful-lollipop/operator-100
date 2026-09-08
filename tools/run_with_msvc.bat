@@ -9,8 +9,12 @@ REM
 REM Usage:   tools\run_with_msvc.bat <command...>
 REM Example: tools\run_with_msvc.bat D:\conda_envs\dl\python.exe -m pytest -q
 REM Note:    if nvcc complains about "unsupported Microsoft Visual
-REM          Studio version", run first:
-REM          set TORCH_NVCC_FLAGS=-allow-unsupported-compiler
+REM          Studio version" or crashes inside cudafe++, the CUDA
+REM          Toolkit is older than your MSVC (e.g. nvcc 13.1 with
+REM          VS 2026). Prefer upgrading the CUDA Toolkit (13.3+
+REM          works with VS 2026). Note that -allow-unsupported-
+REM          compiler is already set in each solution.py, and
+REM          torch >= 2.12 no longer reads TORCH_NVCC_FLAGS.
 REM ============================================================
 if "%~1"=="" (
   echo Usage: %~nx0 ^<command...^>

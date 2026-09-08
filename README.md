@@ -3,7 +3,7 @@
 > 以大模型算子为主线，从「向量加法」一路写到「Flash Attention」的动手题库。
 > 每题多种解法：**PyTorch 参考 / CUDA / Triton**，后续接入**昇腾（Ascend C / Triton-Ascend）**等国产后端。
 
-![License](https://img.shields.io/badge/license-MIT-blue) ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![CUDA](https://img.shields.io/badge/CUDA-12%2B-green)
+[![CI](https://github.com/colorful-lollipop/operator-100/actions/workflows/ci.yml/badge.svg)](https://github.com/colorful-lollipop/operator-100/actions/workflows/ci.yml) ![License](https://img.shields.io/badge/license-MIT-blue) ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![CUDA](https://img.shields.io/badge/CUDA-12%2B-green)
 
 ---
 
