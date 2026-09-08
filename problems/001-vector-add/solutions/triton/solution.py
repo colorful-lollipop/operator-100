@@ -20,6 +20,6 @@ def vector_add(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     assert a.shape == b.shape and a.is_cuda, "输入必须为同形状 CUDA 张量"
     c = torch.empty_like(a)
     n = a.numel()
-    grid = lambda meta: (triton.cdiv(n, meta["BLOCK_SIZE"]),)
+    grid = lambda meta: (triton.cdiv(n, meta["BLOCK_SIZE"]),)  # noqa: B023 —— grid 立即调用，闭包安全
     _vector_add_kernel[grid](a, b, c, n, BLOCK_SIZE=1024, num_warps=4)
     return c

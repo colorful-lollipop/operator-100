@@ -59,6 +59,17 @@ def transpose(x: torch.Tensor) -> torch.Tensor
 - 正确性：`python test.py` 全绿（fp32，atol=rtol=0——转置是精确操作，容差为 0 才对）；
 - 性能：`bytes = 2 × rows × cols × 4`，**tiled 版带宽 ≥ naive 版的 2 倍**（RTX 4070 Ti SUPER 上 naive 约 300 GB/s，tiled 应接近 600 GB/s）。
 
+## 性能参考（RTX 4070 Ti SUPER 实测，torch 2.12.0+cu132，8192×8192 fp32）
+
+| 实现 | 耗时 | 带宽 |
+|---|---|---|
+| torch eager（`.t().contiguous()`） | 2.019 ms | 265.9 GB/s |
+| cuda（naive） | 2.544 ms | 211.0 GB/s |
+| cuda（tiled，+1 padding） | 1.070 ms | 501.6 GB/s |
+| triton（32×32 分块） | 0.904 ms | 594.1 GB/s |
+
+两个观察：① naive 手写版比 torch 还慢（写不合并的代价），tiled 版带来 **2.38×** 加速——这是"读合并、写也合并"的直接证据；② 转置是天然困难户，torch 的通用 kernel 也没有魔法（266 GB/s），这正是手写 tiled kernel 的价值所在。
+
 ## 参考资料
 
 - [An Efficient Matrix Transpose in CUDA C++（NVIDIA Blog）](https://developer.nvidia.com/blog/efficient-matrix-transpose-cuda-cc/)

@@ -5,21 +5,26 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 
-// block 内 sum 归约（与 004/006 同款：warp shuffle + 共享内存）
+// block 内求和归约三步：warp 内 shuffle -> warp 间共享内存 -> 广播回全 block。
+// 最终结果只由 warp0 算出，必须写回共享内存让所有线程拿到同一个值，
+// 否则只有 warp0 的线程能拿到正确缩放系数（经典错误，004 里因只有 thread0
+// 用结果而侥幸正确，本题需要全 block 广播）。
 template <int BLOCK>
 __device__ __forceinline__ float block_sum(float v) {
   constexpr int kWarps = BLOCK / 32;
   __shared__ float warp_sums[kWarps];
   const int lane = threadIdx.x % 32, warp = threadIdx.x / 32;
+  __syncthreads();  // 入口屏障：连续多次归约时防止共享内存复用竞态
   for (int s = 16; s > 0; s >>= 1) v += __shfl_down_sync(0xffffffffu, v, s);
   if (lane == 0) warp_sums[warp] = v;
   __syncthreads();
-  float out = 0.0f;
   if (warp == 0) {
-    if (lane < kWarps) out = warp_sums[lane];
+    float out = (lane < kWarps) ? warp_sums[lane] : 0.0f;
     for (int s = 16; s > 0; s >>= 1) out += __shfl_down_sync(0xffffffffu, out, s);
+    if (lane == 0) warp_sums[0] = out;  // 广播位
   }
-  return out;
+  __syncthreads();
+  return warp_sums[0];
 }
 
 // 两遍扫描：先平方和，再统一写回。sumsq/H + eps 后取 rsqrt。
@@ -32,7 +37,7 @@ __global__ void rms_norm_fp32_kernel(const float* __restrict__ x,
   float acc = 0.0f;
   for (long i = threadIdx.x; i < cols; i += BLOCK) acc += xr[i] * xr[i];
   acc = block_sum<BLOCK>(acc);
-  const float inv = rsqrtf(acc / cols + eps);  // 只由 thread 0 的值有意义，但广播到全体
+  const float inv = rsqrtf(acc / cols + eps);  // block_sum 已广播：全 block 拿到同一个值
   for (long i = threadIdx.x; i < cols; i += BLOCK) yr[i] = xr[i] * inv * w[i];
 }
 
@@ -60,7 +65,7 @@ torch::Tensor rms_norm(torch::Tensor x, torch::Tensor w, double eps) {
   TORCH_CHECK(w.scalar_type() == at::kFloat, "w must be fp32");
   TORCH_CHECK(x.dim() == 2, "x must be 2D [rows, H]");
   const bool is_fp32 = x.scalar_type() == at::kFloat;
-  const bool is_fp16 = x.scalar_type() == at::Half;
+  const bool is_fp16 = x.scalar_type() == at::kHalf;
   TORCH_CHECK(is_fp32 || is_fp16, "fp32 / fp16 supported");
   auto xc = x.contiguous();
   auto wc = w.contiguous();

@@ -20,16 +20,15 @@ def main():
     print(f"device: {torch.cuda.get_device_name(0)} | torch {torch.__version__} | N = {N}")
     mods = load_problem(Path(__file__).resolve().parent, "003")
     x = torch.randn(N, device="cuda")
-    bias = torch.randn(N, device="cuda")  # fused 场景退化为无广播，测纯 elementwise 上限
     nbytes = 2 * N * 4
 
     for kind, tag in [(0, "relu"), (1, "silu"), (2, "sigmoid")]:
         print(f"-- {tag} --")
-        report("torch eager", time_ms(lambda: mods["reference"].act(x, kind)), nbytes)
+        report("torch eager", time_ms(lambda k=kind: mods["reference"].act(x, k)), nbytes)
         if "cuda" in mods:
-            report("cuda", time_ms(lambda: mods["cuda"].act(x, kind)), nbytes)
+            report("cuda", time_ms(lambda k=kind: mods["cuda"].act(x, k)), nbytes)
         if "triton" in mods:
-            report("triton", time_ms(lambda: mods["triton"].act(x, kind)), nbytes)
+            report("triton", time_ms(lambda k=kind: mods["triton"].act(x, k)), nbytes)
 
 
 if __name__ == "__main__":

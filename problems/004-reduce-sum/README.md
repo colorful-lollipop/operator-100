@@ -56,6 +56,16 @@ block 内线程按 <code>i = base + k*blockDim + tid</code> 跨步读数据（�
 - 正确性：`python test.py` 全绿（与 fp64 真值比：rtol=1e-3, atol=1e-2）；
 - 性能：`bytes ≈ n × 4`（只读，输出可忽略），CUDA 版 ≥ torch eager 的 80%（torch 的 reduce 是高度调优的，80% 已是及格线）。
 
+## 性能参考（RTX 4070 Ti SUPER 实测，torch 2.12.0+cu132，N = 64M fp32）
+
+| 实现 | 耗时 | 带宽 |
+|---|---|---|
+| torch eager | 0.418 ms | 641.8 GB/s |
+| cuda（两级归约 + shuffle） | 0.422 ms | 635.6 GB/s |
+| triton | 0.419 ms | 641.4 GB/s |
+
+两级归约的手写版达到 torch 的 99%——归约是"优化到头"的经典案例，Harris 讲义里的 7 个版本就是这段历史的浓缩。
+
 ## 参考资料
 
 - [Mark Harris《Optimizing Parallel Reduction in CUDA》](https://developer.download.nvidia.com/assets/cuda/files/reduction.pdf)（必读，7 版本递进）

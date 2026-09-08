@@ -56,6 +56,16 @@ max 归约和 sum 归约复用同一块 <code>__shared__</code>——第二次�
 - 正确性：`python test.py` 全绿（fp32 atol=rtol=1e-5；fp16 atol=rtol=1e-3）；
 - 性能：`bytes = 2 × rows × cols × 4`（fp32），fp16 减半；CUDA 版 ≥ torch eager 的 80%。
 
+## 性能参考（RTX 4070 Ti SUPER 实测，torch 2.12.0+cu132，8192×4096）
+
+| 实现 | fp32 | fp16 |
+|---|---|---|
+| torch eager | 0.428 ms / 627 GB/s | 0.250 ms / 536 GB/s |
+| cuda | 0.428 ms / 627 GB/s | 0.250 ms / 537 GB/s |
+| triton | 0.428 ms / 627 GB/s | 0.214 ms / 627 GB/s |
+
+fp16 下 Triton 比 CUDA 手写版快 17%：Triton 编译器自动做了向量化访存，而我们的标量 `__half` 读写没有——这正是选做题（half2 向量化）要补齐的差距。
+
 ## 参考资料
 
 - [OneFlow：如何实现一个高效的 Softmax CUDA kernel](https://blog.csdn.net/oneflow_official/article/details/112175731)（中文必读）

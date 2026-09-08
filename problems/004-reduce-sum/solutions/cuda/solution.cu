@@ -17,13 +17,14 @@ struct SumOp {
 
 // block 内树形归约：warp 内 shuffle（寄存器交换，零共享内存流量），warp 间共享内存。
 // 返回值仅 threadIdx.x == 0 有效。
-// 注意：同一 block 内连续调用两次本函数时，函数入口的 __syncthreads()
-// 保证第二次写入 warp_sums 前上一次读取已结束，避免脏读。
+// 入口 __syncthreads()：同一 block 连续调用两次本函数时（如先 max 后 sum），
+// 保证前一次对 warp_sums 的读取全部结束后才允许本次写入，消除共享内存复用竞态。
 template <typename Op>
 __device__ __forceinline__ float block_reduce(float v, Op op, float identity) {
   __shared__ float warp_sums[kWarps];
   const int lane = threadIdx.x % 32;
   const int warp = threadIdx.x / 32;
+  __syncthreads();
 
   for (int s = 16; s > 0; s >>= 1) v = op(v, __shfl_down_sync(0xffffffffu, v, s));
   if (lane == 0) warp_sums[warp] = v;

@@ -58,6 +58,16 @@ def vector_add(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor  # 返回新张
 - 正确性：`python test.py` 全绿（fp32，atol=rtol=1e-5）；
 - 性能：`python bench.py` 中 CUDA 版带宽 ≥ torch eager 的 90%（RTX 4070 Ti SUPER 参考值：≥ 600 GB/s）。该算子每次调用读 2 个数组、写 1 个数组，`bytes = 3 × n × 4`。
 
+## 性能参考（RTX 4070 Ti SUPER 实测，torch 2.12.0+cu132，N = 16M fp32）
+
+| 实现 | 耗时 | 带宽 |
+|---|---|---|
+| torch eager | 0.319 ms | 630.5 GB/s |
+| cuda（grid-stride） | 0.317 ms | 634.5 GB/s |
+| triton | 0.319 ms | 631.8 GB/s |
+
+理论带宽 672 GB/s：好的实现应 ≥ 90%（~600 GB/s）。这条题的带宽就是"天花板"——后面所有 memory-bound 算子都拿它当尺子。
+
 ## 参考资料
 
 - NVIDIA 官方样例 [cuda-samples/vectorAdd](https://github.com/NVIDIA/cuda-samples/tree/master/Samples/1_Utilities/vectorAdd)

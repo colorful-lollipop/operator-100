@@ -54,6 +54,16 @@ def layer_norm(x: torch.Tensor, w: torch.Tensor, b: torch.Tensor, eps: float = 1
 - 正确性：`python test.py` 全绿（fp32 atol=rtol=1e-4；fp16 atol=rtol=1e-2）；
 - 性能：`bytes ≈ 3 × rows × H × 4`（x 读 2 次 + 写 1 次，fp32），CUDA 版 ≥ torch eager 的 70%（LayerNorm 多遍读，torch 内部向量化很强）。
 
+## 性能参考（RTX 4070 Ti SUPER 实测，torch 2.12.0+cu132，8192×4096）
+
+| 实现 | fp32 | fp16 |
+|---|---|---|
+| torch eager | 0.443 ms / 910 GB/s* | 1.083 ms / 186 GB/s |
+| cuda | 0.428 ms / 940 GB/s* | 0.263 ms / 767 GB/s |
+| triton | 0.428 ms / 940 GB/s* | 0.214 ms / 940 GB/s |
+
+\* 超过 DRAM 峰值带宽（672 GB/s）是因为行的第二次读命中 L2（见 bench.py 注释）。fp16 下手写 kernel 比 torch eager 快 5×——ATen 的通用 fp16 路径远没打满带宽。
+
 ## 参考资料
 
 - [Triton 教程 05-layer-norm](https://triton-lang.org/main/getting-started/tutorials/05-layer-norm.html)（含 backward，是题 081 的预告）

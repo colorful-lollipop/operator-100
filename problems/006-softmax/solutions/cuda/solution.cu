@@ -12,20 +12,26 @@
 constexpr int kMaxBlock = 1024;
 constexpr int kMaxWarps = kMaxBlock / 32;
 
+// block 内归约三步：warp 内 shuffle -> warp 间共享内存 -> 广播回全 block。
+// 关键：最终结果只由 warp0 算出，必须写回共享内存让所有线程拿到同一个值——
+// 忘记广播是行归约 kernel 最经典的错误（004 里只有 thread0 用结果所以侥幸没炸）。
+// 入口 __syncthreads()：同一 kernel 连续调用两次归约时防止共享内存复用竞态。
 template <int BLOCK>
 __device__ __forceinline__ float block_max(float v) {
   constexpr int kWarps = BLOCK / 32;
   __shared__ float warp_sums[kWarps];
   const int lane = threadIdx.x % 32, warp = threadIdx.x / 32;
+  __syncthreads();
   for (int s = 16; s > 0; s >>= 1) v = fmaxf(v, __shfl_down_sync(0xffffffffu, v, s));
   if (lane == 0) warp_sums[warp] = v;
   __syncthreads();
-  float out = -INFINITY;
   if (warp == 0) {
-    if (lane < kWarps) out = warp_sums[lane];
+    float out = (lane < kWarps) ? warp_sums[lane] : -INFINITY;
     for (int s = 16; s > 0; s >>= 1) out = fmaxf(out, __shfl_down_sync(0xffffffffu, out, s));
+    if (lane == 0) warp_sums[0] = out;  // 广播位
   }
-  return out;
+  __syncthreads();
+  return warp_sums[0];
 }
 
 template <int BLOCK>
@@ -33,15 +39,17 @@ __device__ __forceinline__ float block_sum(float v) {
   constexpr int kWarps = BLOCK / 32;
   __shared__ float warp_sums[kWarps];
   const int lane = threadIdx.x % 32, warp = threadIdx.x / 32;
+  __syncthreads();
   for (int s = 16; s > 0; s >>= 1) v += __shfl_down_sync(0xffffffffu, v, s);
   if (lane == 0) warp_sums[warp] = v;
-  __syncthreads();  // 复用 warp_sums 前，保证上一轮（max 归约）读取已完成
-  float out = 0.0f;
+  __syncthreads();
   if (warp == 0) {
-    if (lane < kWarps) out = warp_sums[lane];
+    float out = (lane < kWarps) ? warp_sums[lane] : 0.0f;
     for (int s = 16; s > 0; s >>= 1) out += __shfl_down_sync(0xffffffffu, out, s);
+    if (lane == 0) warp_sums[0] = out;  // 广播位
   }
-  return out;
+  __syncthreads();
+  return warp_sums[0];
 }
 
 // ---- fp32 行 softmax：block 按行跨步扫描 ----
@@ -92,7 +100,7 @@ torch::Tensor softmax(torch::Tensor x) {
   TORCH_CHECK(x.is_cuda(), "x must be a CUDA tensor");
   TORCH_CHECK(x.dim() == 2, "x must be 2D [rows, cols]");
   const bool is_fp32 = x.scalar_type() == at::kFloat;
-  const bool is_fp16 = x.scalar_type() == at::Half;
+  const bool is_fp16 = x.scalar_type() == at::kHalf;
   TORCH_CHECK(is_fp32 || is_fp16, "fp32 / fp16 supported");
   auto xc = x.contiguous();
   const long rows = xc.size(0), cols = xc.size(1);

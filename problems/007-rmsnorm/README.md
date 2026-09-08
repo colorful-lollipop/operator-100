@@ -55,6 +55,16 @@ eps 在开根号<b>内</b>、除法<b>外</b>：<code>rsqrtf(mean + eps)</code>�
 - 正确性：`python test.py` 全绿（fp32 atol=rtol=1e-5；fp16 atol=rtol=1e-2）；
 - 性能：`bytes ≈ 2 × rows × H × 4`（fp32；w 可忽略），CUDA 版 ≥ torch eager 的 85%。
 
+## 性能参考（RTX 4070 Ti SUPER 实测，torch 2.12.0+cu132，8192×4096）
+
+| 实现 | fp32 | fp16 |
+|---|---|---|
+| torch eager（多 kernel 组合） | 1.501 ms / 179 GB/s | 2.141 ms / 63 GB/s |
+| cuda（单 kernel） | 0.428 ms / 628 GB/s | 0.226 ms / 595 GB/s |
+| triton（单 kernel） | 0.428 ms / 627 GB/s | 0.214 ms / 627 GB/s |
+
+**fp32 下 3.5×、fp16 下 10× 的差距**来自哪里？eager 的 `pow → mean → rsqrt → mul → mul → cast` 每步都完整读写一次显存，而融合 kernel 只有一次读一次写。这就是"融合"二字的含义，也是 027-030 一整章融合算子的动机。
+
 ## 参考资料
 
 - Zhang & Sennrich, [Root Mean Square Layer Normalization (arXiv:1910.07467)](https://arxiv.org/abs/1910.07467)

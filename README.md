@@ -53,6 +53,8 @@ python bench.py       # 性能：GB/s 对比（memory-bound 算子看带宽）
 - **中文 Windows 的经典坑**：`.cu` 文件的字符串字面量（如 TORCH_CHECK 报错信息）必须用英文——GBK 代码页下 nvcc 解析 UTF-8 字符串会报 "missing closing quote"；中文注释则安全无碍；
 - Triton：直接 `pip install triton-windows`（社区轮子）即可在 Windows 原生运行，无需 WSL2。
 
+> **本仓库验证环境**：RTX 4070 Ti SUPER · Windows · Python 3.14 · torch 2.12.0+cu132 · CUDA 13.3 (nvcc) · MSVC 14.51 (VS 2026) · triton 3.8.0。第1章（001-008）三后端 **191 个用例全部通过**，性能数据见各题 README。
+
 ### 题目目录结构（每题自包含）
 
 ```

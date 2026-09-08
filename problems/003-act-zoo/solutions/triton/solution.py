@@ -47,7 +47,7 @@ def act(x: torch.Tensor, kind: int) -> torch.Tensor:
     assert x.is_cuda and 0 <= kind <= 2, "输入必须是 CUDA 张量，kind 取 0/1/2"
     y = torch.empty_like(x)
     n = x.numel()
-    grid = lambda meta: (triton.cdiv(n, meta["BLOCK"]),)
+    grid = lambda meta: (triton.cdiv(n, meta["BLOCK"]),)  # noqa: B023 —— grid 立即调用，闭包安全
     _act_kernel[grid](x, y, n, KIND=kind, BLOCK=1024, num_warps=4)
     return y
 
@@ -57,7 +57,7 @@ def fused_bias_act(x: torch.Tensor, bias: torch.Tensor, kind: int) -> torch.Tens
     assert bias.numel() == x.size(1), "bias 长度必须等于 cols"
     y = torch.empty_like(x)
     n = x.numel()
-    grid = lambda meta: (triton.cdiv(n, meta["BLOCK"]),)
+    grid = lambda meta: (triton.cdiv(n, meta["BLOCK"]),)  # noqa: B023 —— grid 立即调用，闭包安全
     _fused_bias_act_kernel[grid](x, bias, y, x.size(0), x.size(1), KIND=kind,
                                  BLOCK=1024, num_warps=4)
     return y

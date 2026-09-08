@@ -24,6 +24,6 @@ def transpose(x: torch.Tensor) -> torch.Tensor:
     assert x.is_cuda and x.dim() == 2, "x 必须是二维 CUDA 张量"
     rows, cols = x.shape
     y = torch.empty(cols, rows, device=x.device, dtype=x.dtype)
-    grid = lambda meta: (triton.cdiv(rows, meta["BLOCK"]), triton.cdiv(cols, meta["BLOCK"]))
+    grid = lambda meta: (triton.cdiv(rows, meta["BLOCK"]), triton.cdiv(cols, meta["BLOCK"]))  # noqa: B023 —— grid 立即调用，闭包安全
     _transpose_kernel[grid](x, y, rows, cols, BLOCK=32)
     return y

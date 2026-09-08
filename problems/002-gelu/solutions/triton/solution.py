@@ -34,6 +34,6 @@ def gelu(x: torch.Tensor, mode: int = 0) -> torch.Tensor:
     assert x.is_cuda, "输入必须是 CUDA 张量"
     y = torch.empty_like(x)
     n = x.numel()
-    grid = lambda meta: (triton.cdiv(n, meta["BLOCK"]),)
+    grid = lambda meta: (triton.cdiv(n, meta["BLOCK"]),)  # noqa: B023 —— grid 立即调用，闭包安全
     _gelu_kernel[grid](x, y, n, MODE=mode, BLOCK=1024, num_warps=4)
     return y

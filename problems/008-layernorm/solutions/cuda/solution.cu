@@ -5,20 +5,26 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 
+// block 内求和归约三步：warp 内 shuffle -> warp 间共享内存 -> 广播回全 block。
+// 最终结果只由 warp0 算出，必须写回共享内存广播给所有线程——否则只有 warp0
+// 的线程拿到正确缩放系数（经典错误，见 006 的详细注释）。
 template <int BLOCK>
 __device__ __forceinline__ float block_sum(float v) {
   constexpr int kWarps = BLOCK / 32;
   __shared__ float warp_sums[kWarps];
   const int lane = threadIdx.x % 32, warp = threadIdx.x / 32;
+  // 入口屏障：本 kernel 连续调用两次（均值、方差），防止共享内存复用竞态
+  __syncthreads();
   for (int s = 16; s > 0; s >>= 1) v += __shfl_down_sync(0xffffffffu, v, s);
   if (lane == 0) warp_sums[warp] = v;
   __syncthreads();
-  float out = 0.0f;
   if (warp == 0) {
-    if (lane < kWarps) out = warp_sums[lane];
+    float out = (lane < kWarps) ? warp_sums[lane] : 0.0f;
     for (int s = 16; s > 0; s >>= 1) out += __shfl_down_sync(0xffffffffu, out, s);
+    if (lane == 0) warp_sums[0] = out;  // 广播位
   }
-  return out;
+  __syncthreads();
+  return warp_sums[0];
 }
 
 // fp32：两遍扫描（μ 与 σ²），第三遍写回。数值稳定优于一遍式 E[x²]-μ²。
@@ -76,7 +82,7 @@ torch::Tensor layer_norm(torch::Tensor x, torch::Tensor w, torch::Tensor b, doub
   TORCH_CHECK(w.scalar_type() == at::kFloat && b.scalar_type() == at::kFloat, "w/b must be fp32");
   TORCH_CHECK(x.dim() == 2, "x must be 2D [rows, H]");
   const bool is_fp32 = x.scalar_type() == at::kFloat;
-  const bool is_fp16 = x.scalar_type() == at::Half;
+  const bool is_fp16 = x.scalar_type() == at::kHalf;
   TORCH_CHECK(is_fp32 || is_fp16, "fp32 / fp16 supported");
   auto xc = x.contiguous();
   auto wc = w.contiguous();
