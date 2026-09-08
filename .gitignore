@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# 编译产物（torch cpp_extension 缓存在用户目录，这里兜底）
+build/
+dist/
+*.so
+*.pyd
+*.obj
+*.exp
+*.lib
+
+# IDE / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

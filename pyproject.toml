@@ -1,0 +1,33 @@
+[project]
+name = "operator-100"
+version = "0.1.0"
+description = "深度学习算子 100 题：从向量加法到 Flash Attention 的动手题库（CUDA / Triton / 预留昇腾等国产后端）"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "ninja>=1.11",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["problems"]
+python_files = ["test.py", "test_*.py"]
+# 各题目录名以数字开头且存在同名 test.py / reference.py，
+# importlib 导入模式可避免 pytest 收集多题时的模块名冲突
+addopts = "--import-mode=importlib"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
